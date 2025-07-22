@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>İHA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    h2 {
+      margin: 0;
+      padding: 15px;
+      background: #1a1a1a;
+      font-size: 20px;
+      text-align: center;
+      user-select: none;
+    }
+    #controls {
+      display: flex;
+      flex-wrap: wrap;
+      padding: 15px;
+      background: #222;
+      justify-content: space-around;
+      gap: 12px;
+      font-size: 14px;
+      user-select: none;
+    }
+    .info-box {
+      background: #333;
+      padding: 10px 15px;
+      border-radius: 8px;
+      min-width: 130px;
+      text-align: center;
+      transition: background-color 0.3s;
+    }
+    .info-title {
+      color: #ccc;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .info-value {
+      font-size: 16px;
+      font-weight: bold;
+      color: cyan;
+      transition: color 0.3s;
+    }
+    button {
+      background: #444;
+      color: #fff;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s, color 0.3s;
+      user-select: none;
+    }
+    button:hover {
+      background: #666;
+      color: #fff;
+    }
+    #map {
+      flex-grow: 1;
+      user-select: none;
+    }
+    /* Footer uçuş verileri */
+    footer {
+      background: #222;
+      padding: 10px 20px;
+      color: #eee;
+      font-size: 14px;
+      border-top: 1px solid #444;
+      user-select: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      color: #eee;
+    }
+    th, td {
+      padding: 6px 12px;
+      border-bottom: 1px solid #444;
+      text-align: center;
+    }
+    th {
+      background-color: #333;
+    }
+    /* Drone ikon SVG */
+    .drone-icon {
+      width: 40px;
+      height: 40px;
+      user-select: none;
+      filter: none;
+    }
+    /* Pervane animasyonu */
+    .propeller {
+      transform-origin: 50% 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+    /* Drone hover hafif sallanma */
+    .drone-hover {
+      animation: hoverUpDown 3s ease-in-out infinite;
+      transform-origin: center;
+    }
+    @keyframes hoverUpDown {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-5px);
+      }
+    }
+    @media (max-width: 600px) {
+      #controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .info-box {
+        width: 100%;
+      }
+      footer {
+        font-size: 12px;
+        padding: 8px 12px;
+      }
+      th, td {
+        padding: 4px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h2>Test</h2>
+
+<div id="controls">
+  <div class="info-box">
+    <div class="info-title">Toplam Nokta</div>
+    <div class="info-value" id="pointCount">0</div>
+  </div>
+  <div class="info-box">
+    <div class="info-title">Toplam Mesafe</div>
+    <div class="info-value" id="distance">0.00 km</div>
+  </div>
+  <div class="info-box">
+    <div class="info-title">Tahmini Süre</div>
+    <div class="info-value" id="duration">0 dk</div>
+  </div>
+  <div class="info-box">
+    <div class="info-title">Batarya (%)</div>
+    <div class="info-value" id="battery">100%</div>
+    <div id="batteryBar"><div id="batteryFill"></div></div>
+  </div>
+  <div class="info-box">
+    <div class="info-title">Hız</div>
+    <div class="info-value" id="speed">0 km/s</div>
+  </div>
+  <button onclick="startSimulation()">Simülasyonu Başlat</button>
+  <button onclick="pauseSimulation()">Duraklat</button>
+  <button onclick="resumeSimulation()">Devam Et</button>
+  <button onclick="resetPath()">Rota Sıfırla</button>
+  <button onclick="loadPresetRoute()">Önceden Tanımlı Rota Yükle</button>
+  <button onclick="toggleWind()">Rüzgar Etkisi: <span id="windStatus">Kapalı</span></button>
+</div>
+
+<div id="map"></div>
+
+<footer>
+  <table>
+    <thead>
+    <tr>
+      <th>Toplam Mesafe (km)</th>
+      <th>Gerçek Tahmini Süre (dk)</th>
+      <th>Kalan Batarya (%)</th>
+      <th>Rüzgar Durumu</th>
+      <th>Rüzgar Hızı (km/s)</th>
+      <th>Rüzgar Yönü (°)</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td id="footerDistance">0.00</td>
+      <td id="footerDuration">0</td>
+      <td id="footerBattery">100</td>
+      <td id="footerWindStatus">Kapalı</td>
+      <td id="footerWindSpeed">0</td>
+      <td id="footerWindDirection">0</td>
+    </tr>
+    </tbody>
+  </table>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const map = L.map('map').setView([40.1828, 29.0665], 14);
+
+  L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {
+      attribution: '© OpenStreetMap & Carto',
+      maxZoom: 19,
+    }
+  ).addTo(map);
+
+  // Alternatif minimalist drone SVG ikonu
+  const droneSVG = `
+    <svg class="drone-icon drone-hover" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" >
+      <circle cx="32" cy="32" r="10" fill="cyan" opacity="0.6" />
+      <circle cx="32" cy="32" r="6" fill="cyan" />
+      <g class="propeller" transform="translate(32, 32)">
+        <rect x="-2" y="-18" width="4" height="12" fill="cyan" />
+        <rect x="14" y="-2" width="12" height="4" fill="cyan" transform="rotate(90)" />
+        <rect x="-2" y="6" width="4" height="12" fill="cyan" />
+        <rect x="-18" y="-2" width="12" height="4" fill="cyan" transform="rotate(90)" />
+      </g>
+    </svg>
+  `;
+
+  const droneIcon = L.divIcon({
+    html: droneSVG,
+    className: '',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+  });
+
+  let path = [];
+  let marker = null;
+  let polyline = null;
+  let simulatedPath = null;
+  let interval = null;
+  let segmentDurations = [];
+  let index = 0;
+  let paused = false;
+  let windOn = false;
+  let windSpeed = 0;
+  let windDirection = 0;
+  let trailGroup = L.layerGroup().addTo(map);
+
+  map.on('click', (e) => {
+    const coord = [Number(e.latlng.lat.toFixed(5)), Number(e.latlng.lng.toFixed(5))];
+    addPoint(coord);
+  });
+
+  function addPoint(coord) {
+    path.push(coord);
+    updateStats();
+
+    const trailCircle = L.circleMarker(coord, {
+      radius: 5,
+      color: 'cyan',
+      opacity: 0.6,
+      className: 'trail-circle'
+    });
+    trailGroup.addLayer(trailCircle);
+
+    if (polyline) map.removeLayer(polyline);
+    polyline = L.polyline(path, { color: 'deepskyblue', weight: 3 }).addTo(map);
+
+    if (!marker) {
+      marker = L.marker(coord, { icon: droneIcon }).addTo(map);
+    }
+  }
+
+  function startSimulation() {
+    if (path.length < 3) {
+      alert('En az 3 nokta ekleyin.');
+      return;
+    }
+    if (interval) cancelAnimationFrame(interval);
+    index = 0;
+    paused = false;
+    segmentDurations = [];
+    trailGroup.clearLayers();
+
+    for (let i = 1; i < path.length; i++) {
+      const distKm = calculateSegmentDistance(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
+      let effectiveSpeed = 36;
+      if (windOn) {
+        const segmentAngle = getAngle(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
+        const windEffect = windSpeed * Math.cos(deg2rad(windDirection - segmentAngle));
+        effectiveSpeed = Math.max(5, effectiveSpeed + windEffect);
+      }
+      const realTimeSec = (distKm / effectiveSpeed) * 3600;
+      const simTimeMs = realTimeSec * 100; // 1/10 hız
+      segmentDurations.push(simTimeMs);
+    }
+
+    if (simulatedPath) map.removeLayer(simulatedPath);
+    simulatedPath = L.polyline([], { color: 'yellow', weight: 1, opacity: 0.9 }).addTo(map);
+
+    smoothMove(index);
+  }
+
+  function getWindDriftVector(angle) {
+    if (!windOn) return { lat: 0, lng: 0 };
+    const driftMagnitude = (windSpeed / 36) * 0.00015;
+    const driftAngle = deg2rad(windDirection + 90);
+    return {
+      lat: Math.sin(driftAngle) * driftMagnitude,
+      lng: Math.cos(driftAngle) * driftMagnitude,
+    };
+  }
+
+  function smoothMove(currentIndex) {
+    if (paused) return;
+    if (currentIndex >= path.length - 1) {
+      finishSimulation();
+      return;
+    }
+
+    const start = path[currentIndex];
+    const end = path[currentIndex + 1];
+    const duration = segmentDurations[currentIndex];
+    const startTime = performance.now();
+
+    const angle = getAngle(start[0], start[1], end[0], end[1]);
+    if (marker && marker.getElement()) {
+      marker.getElement().style.transition = 'transform 0.1s linear';
+      marker.getElement().style.transform = `rotate(${angle}deg)`;
+    }
+
+    function animate(time) {
+      if (paused) return;
+      const elapsed = time - startTime;
+      const t = Math.min(elapsed / duration, 1);
+
+      const drift = getWindDriftVector(angle);
+
+      const lat = start[0] + (end[0] - start[0]) * t + drift.lat * (1 - t);
+      const lng = start[1] + (end[1] - start[1]) * t + drift.lng * (1 - t);
+
+      marker.setLatLng([lat, lng]);
+      map.panTo([lat, lng], { animate: false });
+
+      let latLngs = simulatedPath.getLatLngs();
+      latLngs.push([lat, lng]);
+      simulatedPath.setLatLngs(latLngs);
+
+      const distKm = calculateSegmentDistance(start[0], start[1], end[0], end[1]);
+      let effectiveSpeed = 36;
+      if (windOn) {
+        const windEffect = windSpeed * Math.cos(deg2rad(windDirection - angle));
+        effectiveSpeed = Math.max(5, effectiveSpeed + windEffect);
+      }
+      document.getElementById('speed').innerText = effectiveSpeed.toFixed(1) + ' km/s';
+
+      const totalDistance = calculateDistance();
+      const distanceCovered = distanceCoveredUntilIndex(currentIndex) + distKm * t;
+      const batteryPercent = Math.max(0, 100 - Math.round((distanceCovered / 5) * 100));
+      document.getElementById('battery').innerText = batteryPercent + '%';
+      updateBatteryBar(batteryPercent);
+
+      updateFooter(totalDistance, batteryPercent);
+
+      if (t < 1) {
+        interval = requestAnimationFrame(animate);
+      } else {
+        index++;
+        smoothMove(index);
+      }
+    }
+
+    interval = requestAnimationFrame(animate);
+  }
+
+  function updateBatteryBar(percent) {
+    const batteryFill = document.getElementById('batteryFill');
+    batteryFill.style.width = percent + '%';
+    if (percent > 60) {
+      batteryFill.style.backgroundColor = 'cyan';
+      batteryFill.style.boxShadow = 'none';
+    } else if (percent > 30) {
+      batteryFill.style.backgroundColor = 'orange';
+      batteryFill.style.boxShadow = 'none';
+    } else {
+      batteryFill.style.backgroundColor = 'red';
+      batteryFill.style.boxShadow = 'none';
+    }
+  }
+
+  function distanceCoveredUntilIndex(idx) {
+    let total = 0;
+    for (let i = 1; i <= idx; i++) {
+      total += calculateSegmentDistance(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
+    }
+    return total;
+  }
+
+  function finishSimulation() {
+    paused = true;
+    document.getElementById('speed').innerText = '0 km/s';
+    const totalKm = calculateDistance();
+    const totalTimeMin = (totalKm / 36) * 60; // Gerçek süre (dakika)
+    const batteryLeft = Math.max(0, 100 - Math.round((totalKm / 5) * 100));
+    updateFooter(totalKm, batteryLeft);
+  }
+
+  function pauseSimulation() {
+    if (paused) return;
+    paused = true;
+    if (interval) cancelAnimationFrame(interval);
+  }
+
+  function resumeSimulation() {
+    if (!paused) return;
+    paused = false;
+    smoothMove(index);
+  }
+
+  function resetPath() {
+    if (interval) cancelAnimationFrame(interval);
+    if (polyline) map.removeLayer(polyline);
+    if (marker) map.removeLayer(marker);
+    if (simulatedPath) map.removeLayer(simulatedPath);
+    trailGroup.clearLayers();
+    path = [];
+    marker = null;
+    polyline = null;
+    simulatedPath = null;
+    index = 0;
+    paused = false;
+    windOn = false;
+    windSpeed = 0;
+    windDirection = 0;
+    updateStats();
+    document.getElementById('report').style.display = 'none';
+    document.getElementById('windStatus').innerText = 'Kapalı';
+    document.getElementById('speed').innerText = '0 km/s';
+    updateFooter(0, 100);
+  }
+
+  function loadPresetRoute() {
+    resetPath();
+    const preset = [
+      [40.1828, 29.0665],
+      [40.185, 29.07],
+      [40.19, 29.065],
+      [40.192, 29.06],
+      [40.195, 29.058],
+      [40.197, 29.055],
+      [40.1985, 29.052],
+    ];
+    for (const p of preset) {
+      addPoint(p);
+    }
+  }
+
+  function toggleWind() {
+    windOn = !windOn;
+    if (windOn) {
+      windSpeed = 5 + Math.random() * 10;
+      windDirection = Math.random() * 360;
+      document.getElementById('windStatus').innerText = 'Açık';
+      document.getElementById('windArrow').style.display = 'block';
+      document.getElementById('windArrow').style.transform = `rotate(${windDirection}deg)`;
+    } else {
+      windSpeed = 0;
+      windDirection = 0;
+      document.getElementById('windStatus').innerText = 'Kapalı';
+      document.getElementById('windArrow').style.display = 'none';
+    }
+  }
+
+  // Footer güncelleme fonksiyonu
+  function updateFooter(distance, battery) {
+    document.getElementById('footerDistance').innerText = distance.toFixed(2);
+    const durationReal = (distance / 36) * 60; // Gerçek süre dakika cinsinden
+    document.getElementById('footerDuration').innerText = durationReal.toFixed(1);
+    document.getElementById('footerBattery').innerText = battery;
+    document.getElementById('footerWindStatus').innerText = windOn ? 'Açık' : 'Kapalı';
+    document.getElementById('footerWindSpeed').innerText = windOn ? windSpeed.toFixed(1) : '0';
+    document.getElementById('footerWindDirection').innerText = windOn ? windDirection.toFixed(0) : '0';
+  }
+
+  function deg2rad(deg) {
+    return (deg * Math.PI) / 180;
+  }
+  function rad2deg(rad) {
+    return (rad * 180) / Math.PI;
+  }
+  function calculateSegmentDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(lat1)) *
+      Math.cos(deg2rad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+  function calculateDistance() {
+    let total = 0;
+    for (let i = 1; i < path.length; i++) {
+      total += calculateSegmentDistance(
+        path[i - 1][0],
+        path[i - 1][1],
+        path[i][0],
+        path[i][1]
+      );
+    }
+    return total;
+  }
+  function getAngle(lat1, lon1, lat2, lon2) {
+    const dLon = deg2rad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(deg2rad(lat2));
+    const x =
+      Math.cos(deg2rad(lat1)) * Math.sin(deg2rad(lat2)) -
+      Math.sin(deg2rad(lat1)) *
+      Math.cos(deg2rad(lat2)) *
+      Math.cos(dLon);
+    const brng = Math.atan2(y, x);
+    return (rad2deg(brng) + 360) % 360;
+  }
+  function updateStats() {
+    document.getElementById('pointCount').innerText = path.length;
+    const km = calculateDistance();
+    document.getElementById('distance').innerText = km.toFixed(2) + ' km';
+    const estimatedMin = ((km / 36) * 60).toFixed(0);
+    document.getElementById('duration').innerText = estimatedMin + ' dk';
+    document.getElementById('battery').innerText = '100%';
+    updateBatteryBar(100);
+    updateFooter(km, 100);
+  }
+</script>
+
+</body>
+</html>
