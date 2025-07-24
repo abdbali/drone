@@ -220,26 +220,17 @@
     }
   ).addTo(map);
 
-  // Alternatif minimalist drone SVG ikonu
-  const droneSVG = `
-    <svg class="drone-icon drone-hover" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" >
-      <circle cx="32" cy="32" r="10" fill="cyan" opacity="0.6" />
-      <circle cx="32" cy="32" r="6" fill="cyan" />
-      <g class="propeller" transform="translate(32, 32)">
-        <rect x="-2" y="-18" width="4" height="12" fill="cyan" />
-        <rect x="14" y="-2" width="12" height="4" fill="cyan" transform="rotate(90)" />
-        <rect x="-2" y="6" width="4" height="12" fill="cyan" />
-        <rect x="-18" y="-2" width="12" height="4" fill="cyan" transform="rotate(90)" />
-      </g>
-    </svg>
-  `;
-
   const droneIcon = L.divIcon({
-    html: droneSVG,
+    html: `
+    <a href="data:image/svg+xml;utf8,%3Csvg%20id%3D%22droneIcon%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%20100%20100%22%3E%0A%20%20%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2222%22%20fill%3D%22white%22%3E%3C%2Fcircle%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2254%25%22%20text-anchor%3D%22middle%22%20fill%3D%22black%22%20font-size%3D%2212%22%20font-family%3D%22Arial%22%20font-weight%3D%22bold%22%3ETB3FLY%3C%2Ftext%3E%0A%3C%2Fsvg%3E%0A" target="_blank">
+      <img src="data:image/svg+xml;utf8,%3Csvg%20id%3D%22droneIcon%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%20100%20100%22%3E%0A%20%20%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2222%22%20fill%3D%22white%22%3E%3C%2Fcircle%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2254%25%22%20text-anchor%3D%22middle%22%20fill%3D%22black%22%20font-size%3D%2212%22%20font-family%3D%22Arial%22%20font-weight%3D%22bold%22%3ETB3FLY%3C%2Ftext%3E%0A%3C%2Fsvg%3E%0A" class="drone-icon drone-hover" alt="Drone Icon" />
+    </a>
+  `,
     className: '',
     iconSize: [40, 40],
     iconAnchor: [20, 20],
   });
+
 
   let path = [];
   let marker = null;
